@@ -17,11 +17,13 @@
         padding: 0px;
         background-color: #aaaa;
         height: 20px;
-        position: absolute;
         left: 0px;
         top: 15px;
         width: 100%;
         height: 40px;
+      }
+      #container div {
+        display: inline-block;
       }
       #filename {
         position: absolute;
@@ -43,6 +45,12 @@
         left: 1600px;
         top: 3px;
       }
+      #error-msg {
+        position: absolute;
+        left: 15px;
+        top: 15px;
+        background-color: red;
+      }
       #filenameValue,
       #durationValue,
       #timeValue,
@@ -60,6 +68,10 @@
   </head>
   <body>
     <div id="container">
+      <div id="time" class="label">
+        REMAIN:&nbsp;
+        <div id="timeValue" class="text">00:00:00</div>
+      </div>
       <div id="filename" class="label">
         NAME:&nbsp;
         <div id="filenameValue" class="text">No clip selected</div>
@@ -68,23 +80,37 @@
         DUR:&nbsp;
         <div id="durationValue" class="text">00:00:00</div>
       </div>
-      <div id="time" class="label">
-        REMAIN:&nbsp;
-        <div id="timeValue" class="text">00:00:00</div>
-      </div>
       <div id="timeleft" class="label">
         COUNT:&nbsp;
         <div id="timeleftValue" class="text">00:00:00</div>
       </div>
+      <p id="error-msg"></p>
     </div>
   </body>
   <script>
+    // Wrap it all in a method to reconnect https://stackoverflow.com/questions/22431751/websocket-how-to-automatically-reconnect-after-it-dies
     const ws = new WebSocket("ws://localhost:9898/");
+    let isConnected = false;
+    let errEl = document.querySelector('#error-msg')
 
-    ws.onopen = function () {
+    errEl.innerHTML = "No connection";
+    errEl.style.backgroundColor = 'red';
+
+    const customOpenHandler = () => {
       console.log("WebSocket Client Connected");
       ws.send("Hi this is web client.");
-    };
+      isConnected = true;
+      errEl.innerHTML = "✓";
+      errEl.style.backgroundColor = 'green';
+    }
+
+    ws.onopen = customOpenHandler;
+    ws.onerror = () => console.log("something bad happened.")
+    ws.onclose = () => {
+      isConnected = false;
+      errEl.innerHTML = "No connection";
+      errEl.style.backgroundColor = 'red';
+    }
     ws.onmessage = function (e) {
       const json = JSON.parse(e.data);
       //   console.log(json.duration.toFixed(2));
@@ -101,6 +127,13 @@
         Math.ceil(json.duration - json.position)
       );
     };
+
+    setInterval(() => {
+      // ws.readyState = 1 for healthy.
+      if(Number(ws.readyState) != 1) {
+        customOpenHandler();
+      }
+    }, 2500);
 
     function secondsToTime(value) {
       if (value === undefined || isNaN(value) || value < 0) value = 0;
